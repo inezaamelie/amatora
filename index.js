@@ -11,7 +11,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 const dbConfig = {
     host: 'bkt5qan0til2lhvgxii0-mysql.services.clever-cloud.com',
     user: 'uznfuopmmsz0ammm',
-    password: 'nI5GbIDrpofIYKolFfGB', 
+    password: 'nI5GbIDrpofIYKolFfGB',
     database: 'bkt5qan0til2lhvgxii0'
 };
 
@@ -32,7 +32,7 @@ function handleDisconnect() {
 
     db.on('error', err => {
         console.error('Database error:', err.stack);
-        if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+        if (err.code === 'PROTOCOL_CONNECTION_LOST' || err.fatal) {
             handleDisconnect(); // Reconnect on connection loss
         } else {
             throw err;
@@ -84,9 +84,16 @@ app.post('/ussd', (req, res) => {
     // Log the incoming request for debugging
     console.log('Received USSD request:', req.body);
 
+    // Handle missing or empty body
+    if (!sessionId || !serviceCode || !phoneNumber) {
+        console.error('Invalid request: missing parameters');
+        res.send('END Invalid request: missing parameters');
+        return;
+    }
+
     // Provide a default value for text if it's undefined
     const textInput = text || '';
-    
+
     // Parse user input
     const userInput = textInput.split('*').map(option => option.trim());
 
@@ -101,13 +108,13 @@ app.post('/ussd', (req, res) => {
         if (userInput[0] === '1' || userInput[0] === '2') {
             // Save user's language choice and move to the name input menu
             userLanguages[phoneNumber] = userInput[0] === '1' ? 'en' : 'rw';
-            response = userLanguages[phoneNumber] === 'en' ? 
-                `CON Please enter your name:` : 
+            response = userLanguages[phoneNumber] === 'en' ?
+                `CON Please enter your name:` :
                 `CON Uzuza umwirondoro: \n Amazina yawe:`;
         } else {
             // Invalid language selection
-            response = `END Invalid selection. Please try again.` + 
-                       `\nIbyo muhisemo Ntago aribyo. Ongera ugerageze.`;
+            response = `END Invalid selection. Please try again.` +
+                `\nIbyo muhisemo Ntago aribyo. Ongera ugerageze.`;
         }
     } else if (userInput.length === 2) {
         // Save user's name
@@ -117,13 +124,13 @@ app.post('/ussd', (req, res) => {
         isAdmin(phoneNumber, isAdmin => {
             if (isAdmin) {
                 // Admin menu
-                response = userLanguages[phoneNumber] === 'en' ? 
-                    `CON Hello ${userNames[phoneNumber]}, choose an option:\n1. View Votes\n2. View Information` : 
+                response = userLanguages[phoneNumber] === 'en' ?
+                    `CON Hello ${userNames[phoneNumber]}, choose an option:\n1. View Votes\n2. View Information` :
                     `CON Muraho ${userNames[phoneNumber]}, Hitamo:\n1. Reba amajwi\n2. Reba amakuru`;
             } else {
                 // Regular user menu
-                response = userLanguages[phoneNumber] === 'en' ? 
-                    `CON Hello ${userNames[phoneNumber]}, choose an option:\n1. Vote Candidate\n2. View Information` : 
+                response = userLanguages[phoneNumber] === 'en' ?
+                    `CON Hello ${userNames[phoneNumber]}, choose an option:\n1. Vote Candidate\n2. View Information` :
                     `CON Muraho ${userNames[phoneNumber]}, Hitamo:\n1. Tora umukandida\n2. Reba amakuru`;
             }
             res.send(response);
@@ -153,14 +160,14 @@ app.post('/ussd', (req, res) => {
                     } else {
                         // Check if the phone number has already voted
                         if (voters.has(phoneNumber)) {
-                            response = userLanguages[phoneNumber] === 'en' ? 
-                                `END You have already voted. Thank you!` : 
+                            response = userLanguages[phoneNumber] === 'en' ?
+                                `END You have already voted. Thank you!` :
                                 `END Waratoye. Murakoze!`;
                         } else {
                             // Retrieve candidates from database
                             getCandidates(candidateNames => {
-                                response = userLanguages[phoneNumber] === 'en' ? 
-                                    `CON Select a candidate:\n` : 
+                                response = userLanguages[phoneNumber] === 'en' ?
+                                    `CON Select a candidate:\n` :
                                     `CON Hitamo umukandida:\n`;
 
                                 candidateNames.forEach((candidate, index) => {
@@ -180,13 +187,13 @@ app.post('/ussd', (req, res) => {
                     db.query(query, [phoneNumber], (err, results) => {
                         if (err) {
                             console.error('Error retrieving user information from database:', err.stack);
-                            response = userLanguage === 'en' ? 
-                                `END Error retrieving your information.` : 
+                            response = userLanguage === 'en' ?
+                                `END Error retrieving your information.` :
                                 `END Ikosa ryo kubona amakuru yawe.`;
                         } else {
                             const votedCandidate = results.length > 0 ? results[0].voted_candidate : 'None';
-                            response = userLanguage === 'en' ? 
-                                `END Your Information:\nPhone: ${phoneNumber}\nName: ${userName}\nVoted Candidate: ${votedCandidate}` : 
+                            response = userLanguage === 'en' ?
+                                `END Your Information:\nPhone: ${phoneNumber}\nName: ${userName}\nVoted Candidate: ${votedCandidate}` :
                                 `END Amakuru yawe:\nTelefone: ${phoneNumber}\nIzina: ${userName}\nUmukandida watoye: ${votedCandidate}`;
                         }
                         res.send(response);
@@ -198,8 +205,8 @@ app.post('/ussd', (req, res) => {
             return; // Return to wait for async callback
         } else {
             // Invalid main menu selection
-            response = userLanguages[phoneNumber] === 'en' ? 
-                `END Invalid selection. Please try again.` : 
+            response = userLanguages[phoneNumber] === 'en' ?
+                `END Invalid selection. Please try again.` :
                 `END Ibyo muhisemo Ntago aribyo. Ongera ugerageze.`;
         }
     } else if (userInput.length === 4) {
@@ -210,8 +217,8 @@ app.post('/ussd', (req, res) => {
             if (candidateIndex >= 0 && candidateIndex < candidateNames.length) {
                 const selectedCandidate = candidateNames[candidateIndex];
                 voters.add(phoneNumber); // Mark this phone number as having voted
-                response = userLanguages[phoneNumber] === 'en' ? 
-                    `END Thank you for voting ${selectedCandidate}!` : 
+                response = userLanguages[phoneNumber] === 'en' ?
+                    `END Thank you for voting ${selectedCandidate}!` :
                     `END Murakoze gutora, Mutoye ${selectedCandidate}!`;
 
                 // Insert voting record into the database
@@ -234,8 +241,8 @@ app.post('/ussd', (req, res) => {
 
                 res.send(response);
             } else {
-                response = userLanguages[phoneNumber] === 'en' ? 
-                    `END Invalid selection. Please try again.` : 
+                response = userLanguages[phoneNumber] === 'en' ?
+                    `END Invalid selection. Please try again.` :
                     `END Ibyo muhisemo Ntago aribyo. Ongera ugerageze.`;
                 res.send(response);
             }
@@ -243,8 +250,8 @@ app.post('/ussd', (req, res) => {
         return; // Return to wait for async callback
     } else {
         // Catch-all for any other invalid input
-        response = userLanguages[phoneNumber] === 'en' ? 
-            `END Invalid selection. Please try again.` : 
+        response = userLanguages[phoneNumber] === 'en' ?
+            `END Invalid selection. Please try again.` :
             `END Ibyo muhisemo Ntago aribyo. Ongera ugerageze.`;
     }
 
