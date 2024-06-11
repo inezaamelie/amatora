@@ -81,8 +81,14 @@ app.post('/ussd', (req, res) => {
     // Extract USSD input
     const { sessionId, serviceCode, phoneNumber, text } = req.body;
 
+    // Log the incoming request for debugging
+    console.log('Received USSD request:', req.body);
+
+    // Provide a default value for text if it's undefined
+    const textInput = text || '';
+    
     // Parse user input
-    const userInput = text.split('*').map(option => option.trim());
+    const userInput = textInput.split('*').map(option => option.trim());
 
     // Determine next action based on user input
     if (userInput.length === 1 && userInput[0] === '') {
